@@ -104,8 +104,8 @@ crontab -e
 
 ### Subscription Management
 - `POST /api/subscriptions/confirm` - Confirm payment and activate subscription
-- `POST /api/subscriptions/cancel` - Cancel subscription at period end
 - `GET /api/subscriptions/me` - Get user's subscription details
+- `POST /api/subscriptions/cancel` - Cancel subscription at period end
 
 ### Usage Tracking
 - `POST /api/usage/consume` - Consume credits for API usage
@@ -159,6 +159,18 @@ const response = await fetch('/api/subscriptions/me?userId=clerk_user_id');
 const data = await response.json();
 console.log('Available credits:', data.data.availableCredits);
 console.log('Daily usage:', data.data.dailyUsage);
+```
+
+### Cancel Subscription
+
+```javascript
+const response = await fetch('/api/subscriptions/cancel', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    userId: 'clerk_user_id'
+  })
+});
 ```
 
 ## Database Schema
