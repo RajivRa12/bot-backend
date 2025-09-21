@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String           @id @default(uuid()) @db.Uuid
+  clerkUserId    String           @unique
+  email          String           @unique
+  name           String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  referralStats  ReferralStats?   @relation("ReferralStatsToUser") // Reverted to optional
+  referredById   String?          @db.Uuid
+  referrals      User[]           @relation("ReferralChain")
+  referredBy     User?            @relation("ReferralChain", fields: [referredById], references: [id])
+  subscriptions  Subscription[]
+  billingHistory BillingHistory[] @relation("UserBillingHistory")
+  creditLedger   CreditLedger[]
+  dailyUsage     DailyUsage[]
+}
+
+model ReferralStats {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @db.Uuid
+  referenceId          String   @unique
+  totalUsersSigned     Int      @default(0)
+  totalPaidSubscribers Int      @default(0)
+  totalEarning         Float    @default(0.00)
+  amountDeduct         Float    @default(0.00)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation("ReferralStatsToUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String         @unique
+  priceMonthly   Float          @default(0.00)
+  priceYearly    Float          @default(0.00)
+  dailyCredits   Int            @default(0)
+  monthlyCredits Int            @default(0)
+  isDaily        Boolean        @default(false)
+  description    String?
+  features       String?
+  subscriptions  Subscription[]
+}
+
+model Subscription {
+  id                   String           @id @default(uuid()) @db.Uuid
+  userId               String           @db.Uuid
+  planId               String           @db.Uuid
+  stripeSubscriptionId String?          @unique
+  billingCycle         String           @default("monthly")
+  status               String           @default("active") // active, canceled, past_due, incomplete
+  currentPeriodStart   DateTime         @default(now())
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean          @default(false)
+  canceledAt           DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                 Plan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  billingHistory       BillingHistory[] @relation("SubscriptionBillingHistory")
+  creditLedger         CreditLedger[]
+  dailyUsage           DailyUsage[]
+}
+
+model BillingHistory {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String       @db.Uuid
+  subscriptionId  String       @db.Uuid
+  amount          Float        @default(0.00)
+  currency        String       @default("usd")
+  status          String       @default("pending")
+  paymentDate     DateTime     @default(now())
+  stripePaymentId String?      @unique
+  externalPaymentId String?    // For Play Store or other payment providers
+  user            User         @relation("UserBillingHistory", fields: [userId], references: [id], onDelete: Cascade)
+  subscription    Subscription @relation("SubscriptionBillingHistory", fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model CreditLedger {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  subscriptionId String       @db.Uuid
+  amount         Int          // Positive for credits added, negative for credits consumed
+  type           String       // "granted", "consumed", "expired", "refunded"
+  description    String?
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model DailyUsage {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  subscriptionId String       @db.Uuid
+  date           DateTime     @db.Date
+  usageCount     Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
